@@ -7,6 +7,7 @@ import pandas as pd
 import nltk
 from nltk.corpus import stopwords  
 import skills_extraction 
+import os
 
 def get_recommendations(file_path):
     # Load dataset:
