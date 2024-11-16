@@ -13,7 +13,7 @@ from spacy.matcher import Matcher
 import csv
 
 # Read skills from CSV file
-file_path=r'data\tech_skills_clean.csv'
+file_path=os.path.join('data', 'tech_skills_clean.csv')
 with open(file_path, 'r') as file:
     csv_reader = csv.reader(file)
     skills = [row for row in csv_reader]
