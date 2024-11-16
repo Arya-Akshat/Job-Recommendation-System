@@ -51,7 +51,7 @@ uploaded_file = st.file_uploader("Choose a PDF file", type="pdf")
 if uploaded_file is not None:
     file_path = save_pdf(uploaded_file)
     st.success(f"File successfully saved at: {file_path}")
-    file_path = file_path.split('\\')[1]
+    file_path = os.path.basename(file_path)
 
     user_skills = skills_extraction.skills_extractor(file_path)#, convert_to_string=True)
     user_work_exp = skills_extraction.workd_exp_extractor(file_path)
