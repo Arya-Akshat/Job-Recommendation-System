@@ -10,7 +10,8 @@ import skills_extraction
 
 def get_recommendations(file_path):
     # Load dataset:
-    jd_df = pd.read_csv(r'data\job_data.csv')
+    path = os.path.join('data', 'job_data.csv')
+    jd_df = pd.read_csv(path)
     # Key skills with weights for different job titles  
     job_skill_weights = {  
         "Data Scientist": {'Python':1, 'Ai':2, 'Sql':1.5, 'AWS':2.5, 'Opencv':2, 'Tensorflow':3, 'Pytorch':3, 'Keras':3, 'Sklearn':2, 'Pandas':3, 'Numpy':3},  
@@ -120,8 +121,9 @@ def get_recommendations(file_path):
                                     (matches[matches.index.isin(filtered_jobs.index)]['Match Confidence'] > 0)]  
     recommended_jobs['Strengths'] = recommended_jobs['skills'].apply(find_strengths)
     recommended_jobs['Weakness'] = recommended_jobs['Title'].apply(find_weaknesses)
-    recommended_jobs = recommended_jobs.sort_values(by='Combined Score', ascending=False)  
-    recommended_jobs.to_csv(r'data\job_recommendations.csv', index=False, header = True)
+    recommended_jobs = recommended_jobs.sort_values(by='Combined Score', ascending=False)
+    path = os.path.join('data', 'job_recommendations.csv')
+    recommended_jobs.to_csv(path, index=False, header = True)
 
     # if not recommended_jobs.empty:
     #     # Output the recommended jobs  
