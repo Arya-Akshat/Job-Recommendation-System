@@ -13,7 +13,7 @@ from spacy.matcher import Matcher
 import csv
 
 # Read skills from CSV file
-file_path=r'.\data\tech_skills_clean.csv'
+file_path=r'data\tech_skills_clean.csv'
 with open(file_path, 'r') as file:
     csv_reader = csv.reader(file)
     skills = [row for row in csv_reader]
@@ -84,7 +84,7 @@ def calculate_years_of_experience(work_experience_text):
     return math.ceil(total_years) 
 
 def workd_exp_extractor(file_path):
-    path=r'.\resume'
+    path=r'resume'
     full_file_path = os.path.join(path, file_path)
     resume_text = extract_text_from_pdf(full_file_path)
     total_years = 0
@@ -97,7 +97,7 @@ def workd_exp_extractor(file_path):
 
 def skills_extractor(file_path, convert_to_string = False):
     # Extract text from PDF
-    path=r'.\resume'
+    path=r'resume'
     full_file_path = os.path.join(path, file_path)
     resume_text = extract_text_from_pdf(full_file_path)
 
