@@ -67,6 +67,7 @@ if uploaded_file is not None:
     st.markdown("### User Work Experience ")
     st.markdown('```'+str(user_work_exp) + ' Years of Average Work Experience ```')
     job_recommendor.get_recommendations(file_path)
+    path = os.path.join('data', 'job_recommendations.csv')
     df = pd.read_csv(r'data\job_recommendations.csv')
     df = df[['Title', 'Description', 'Location', 'Company Name', 'Company Apply Url', 'Required Experience', 'skills', 'Strengths', 'Weakness']]
     st.markdown("### Job Recommendations for User")
