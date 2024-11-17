@@ -69,7 +69,7 @@ if uploaded_file is not None:
     job_recommendor.get_recommendations(file_path)
     path = os.path.join('data', 'job_recommendations.csv')
     df = pd.read_csv(path)
-    df = df[['Title', 'Description', 'Location', 'Company Name', 'Company Apply Url', 'Required Experience', 'skills', 'Strengths', 'Weakness']]
+    df = df[['Title', 'Description', 'Location', 'Company Name', 'Company Apply Url', 'Required Experience', 'skills', 'Strengths', 'Weakness', 'Match Confidence', 'Combined Score']]
     st.markdown("### Job Recommendations for User")
     st.dataframe(df)
 
