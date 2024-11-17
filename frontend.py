@@ -6,7 +6,7 @@ import pandas as pd
 import google.generativeai as genai
 
 st.set_page_config(
-    page_title="Job Recommendation System",
+    page_title="Job Mil Jaye SimSim",
     layout="wide",
     initial_sidebar_state="expanded",  # Options: "auto", "expanded", "collapsed"
 )
