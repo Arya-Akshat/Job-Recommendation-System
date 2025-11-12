@@ -65,7 +65,7 @@ export const JobCard = ({ job, index }: JobCardProps) => {
         onClick={() => {
           const url = job.applyUrl && /^https?:\/\//i.test(job.applyUrl)
             ? job.applyUrl
-            : `https://example.com/apply/${job.id}`;
+            : `https://jobs.python.org/jobs/`;
           window.open(url, "_blank");
         }}
       >

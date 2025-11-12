@@ -1,7 +1,7 @@
 Title,Company Name,Description,Link,Required Experience,Job Type,Location,Salary,Company,Posted Date,Detail URL,Company Logo,Company Apply Url,Processed Job Description,skills
-Junior Python Developer,Acme Corp,"Looking for a junior Python developer with knowledge of Django, REST APIs, and SQL.",https://example.com/job/1,1,Full-time,Remote,$60k-$80k,,,,,,,
-Data Scientist,DataWorks,"We need a Data Scientist experienced in Python, pandas, scikit-learn, and machine learning.",https://example.com/job/2,3,Full-time,San Francisco,$120k-$150k,,,,,,,
-Frontend Developer,UI Labs,"Expertise in React, TypeScript, CSS and modern frontend tooling.",https://example.com/job/3,2,Full-time,Remote,$90k-$120k,,,,,,,
+Junior Python Developer,Acme Corp,"Looking for a junior Python developer with knowledge of Django, REST APIs, and SQL.",https://jobs.python.org/jobs/,1,Full-time,Remote,$60k-$80k,,,,,,,
+Data Scientist,DataWorks,"We need a Data Scientist experienced in Python, pandas, scikit-learn, and machine learning.",https://jobs.python.org/jobs/,3,Full-time,San Francisco,$120k-$150k,,,,,,,
+Frontend Developer,UI Labs,"Expertise in React, TypeScript, CSS and modern frontend tooling.",https://jobs.python.org/jobs/,2,Full-time,Remote,$90k-$120k,,,,,,,
 Senior Ground Software Engineer,New Senior Ground Software Engineer E-Space,,https://jobs.python.org/jobs/8003/,0,"Back end,Cloud,Database","Saratoga, California, United States",,New Senior Ground Software Engineer E-Space,06 November 2025,https://jobs.python.org/jobs/8003/,,,,
 Backend Engineering Specialist (Full Time),New Backend Engineering Specialist (Full Time) Mercor,,https://jobs.python.org/jobs/8002/,0,"Back end,Database","Remote or in-person (Palo Alto, CA); in-office requires 5 days/week., California, USA",,New Backend Engineering Specialist (Full Time) Mercor,05 November 2025,https://jobs.python.org/jobs/8002/,,,,
 Senior Back-End Developer,New Senior Back-End Developer Showcare,,https://jobs.python.org/jobs/8001/,0,"Back end,Cloud,Database,Lead,Operations,Web","Remote, Canada",,New Senior Back-End Developer Showcare,03 November 2025,https://jobs.python.org/jobs/8001/,,,,
