@@ -247,7 +247,7 @@ const Index = () => {
 
   const mapBackendToJob = (rec: any, idx: number): Job => {
     return {
-      id: rec.Link || String(idx),
+      id: rec.id || String(idx),
       title: rec.Title || rec.title || "Untitled",
       company: rec["Company Name"] || rec.Company || rec.company || "",
       location: rec.Location || rec.location || "",
@@ -255,6 +255,7 @@ const Index = () => {
       type: rec["Job Type"] || rec.type || "",
       description: rec.Description || rec.description || rec["Processed Job Description"] || "",
       matchScore: Math.round((rec["Combined Score"] || rec["Match Confidence"] || 0) * 100),
+      applyUrl: rec.Link || rec.link || rec.ApplyLink || rec.apply_url || rec.application_url || "",
     };
   };
 

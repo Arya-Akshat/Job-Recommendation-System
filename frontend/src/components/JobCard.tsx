@@ -10,6 +10,7 @@ export interface Job {
   type: string;
   description: string;
   matchScore: number;
+  applyUrl?: string;
 }
 
 interface JobCardProps {
@@ -61,7 +62,12 @@ export const JobCard = ({ job, index }: JobCardProps) => {
 
       <Button
         className="w-full bg-gradient-to-r from-primary to-secondary hover:opacity-90 transition-opacity rounded-full"
-        onClick={() => window.open(`https://example.com/apply/${job.id}`, "_blank")}
+        onClick={() => {
+          const url = job.applyUrl && /^https?:\/\//i.test(job.applyUrl)
+            ? job.applyUrl
+            : `https://example.com/apply/${job.id}`;
+          window.open(url, "_blank");
+        }}
       >
         Apply Now
       </Button>
