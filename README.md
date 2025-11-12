@@ -1,3 +1,20 @@
+# Quick start — very short
+
+- Backend (dev):
+	1. cd backend
+	2. python3 -m venv venv_backend
+	3. source venv_backend/bin/activate
+	4. pip install -r ../requirements.txt
+	5. ./venv_backend/bin/python -m uvicorn app:app --reload --host 127.0.0.1 --port 8000
+
+- Frontend (dev):
+	1. cd frontend
+	2. npm install
+	3. npm run dev
+	4. Open http://localhost:5173
+
+---
+
 
 # Job Recommendation System
 
@@ -121,17 +138,3 @@ The repository `.gitignore` already contains `backend/.env` entries — do not c
 	curl -X POST "http://127.0.0.1:8000/recommend_jobs" -H "Content-Type: application/json" \
 		-d '{"skills": ["python","pandas","sql"], "years_experience": 3}'
 	```
-
-## Notes, caveats and maintenance
-
-- Large files: there are large binaries in the repository history (for example under `backend/venv_backend/...`). These increase clone size and trigger GitHub warnings. To remove them fully from history use `git-filter-repo` or BFG and then force-push the cleaned history. (This repo already contains a backup branch `backup-before-author-rewrite`.)
-- Don't commit virtual environments or `.env` files. Keep secrets out of git.
-- If you recreate the frontend `node_modules` or the backend venv, run the install commands above rather than checking them in.
-
-## Who to contact / authorship
-
-This copy of the repo has been prepared and normalized to the primary maintainer: `Arya-Akshat <akshat.arya13@gmail.com>`.
-
----
-
-If you'd like, I can add a short CONTRIBUTING.md with developer notes (test matrix, linters, or CI) or remove the backup branch from the remote once you confirm everything looks correct.
