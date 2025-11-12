@@ -89,6 +89,25 @@ def get_recommendations(user_skills_list: List[str], user_work_experience: int) 
         print(f"Error: {JOB_DATA_PATH} not found.")
         return pd.DataFrame() # Return empty DataFrame on error
 
+    # Ensure a usable Link/apply URL column exists. Some datasets use different
+    # column names (e.g. 'Link', 'Detail URL', 'Company Apply Url'). Normalize
+    # into a single 'Link' column so the API always returns a consistent field.
+    alt_cols = ['Link', 'Company Apply Url', 'Detail URL', 'Detail URL', 'Company']
+    if 'Link' not in jd_df.columns:
+        jd_df['Link'] = ''
+
+    # For each alternative column, if Link is empty for a row, try to fill it
+    # from the alternative column's value.
+    for col in ['Company Apply Url', 'Detail URL', 'Company']:
+        if col in jd_df.columns:
+            def choose_link(row):
+                cur = row.get('Link')
+                alt = row.get(col)
+                if cur is None or cur == '' or (isinstance(cur, float) and pd.isna(cur)):
+                    return alt if alt is not None else ''
+                return cur
+            jd_df['Link'] = jd_df.apply(choose_link, axis=1)
+
     try:
         with open(SKILL_WEIGHTS_PATH, 'r') as f:
             job_skill_weights = json.load(f)
