@@ -1,0 +1,91 @@
+{
+    "Data Scientist": {
+        "Python": 1,
+        "Ai": 2,
+        "Sql": 1.5,
+        "AWS": 2.5,
+        "Opencv": 2,
+        "Tensorflow": 3,
+        "Pytorch": 3,
+        "Keras": 3,
+        "Sklearn": 2,
+        "Pandas": 3,
+        "Numpy": 3
+    },
+    "Frontend": {
+        "Html": 1,
+        "React": 3,
+        "Typescript": 3,
+        "Java": 2,
+        "Git": 1,
+        "Javascript": 2,
+        "Css": 2,
+        "Rest": 3
+    },
+    "Backend": {
+        "Java": 2,
+        "Sql": 2,
+        "Linux": 1,
+        "Api": 2,
+        "Git": 2,
+        "Cloud": 2,
+        "Azure": 3,
+        "Aws": 3,
+        "Python": 1
+    },
+    "Devops": {
+        "Python": 2,
+        "Cloud": 2,
+        "Azure": 3,
+        "Shell": 2,
+        "Aws": 3,
+        "Linux": 1,
+        "Mongodb": 2,
+        "Postgres": 2,
+        "Mysql": 1,
+        "Git": 2
+    },
+    "Cloud": {
+        "Azure": 3,
+        "Cloud": 3,
+        "Aws": 3,
+        "Mongodb": 2,
+        "Postgres": 2,
+        "Mysql": 1,
+        "Api": 3,
+        "Java": 2,
+        "C": 1,
+        "Html": 1,
+        "Javascript": 2,
+        "Css": 1,
+        "Typescript": 1,
+        "Rest": 2,
+        "Shell": 3
+    },
+    "Application Developer": {
+        "Java": 2,
+        "Mongodb": 2,
+        "Flutter": 3,
+        "Python": 1,
+        "Nosql": 1,
+        "React": 3,
+        "Sql": 2,
+        "Git": 2,
+        "Javascript": 2,
+        "Dart": 3,
+        "Aws": 1,
+        "Css": 1,
+        "Api": 2,
+        "Mysql": 1
+    },
+    "Engineer": {
+        "C++": 2,
+        "Python": 3,
+        "C": 2,
+        "Java": 3,
+        "Javascript": 2,
+        "Typescript": 2,
+        "Aws": 3,
+        "Git": 3
+    }
+}
