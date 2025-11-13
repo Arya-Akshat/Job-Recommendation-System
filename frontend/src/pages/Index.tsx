@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ResumeUpload } from "@/components/ResumeUpload";
 import { JobCard, Job } from "@/components/JobCard";
 import { Briefcase } from "lucide-react";
@@ -83,9 +83,83 @@ const Index = () => {
   const [suggestions, setSuggestions] = useState<string>("");
   const [aiLoading, setAiLoading] = useState(false);
   const [fetchingJobs, setFetchingJobs] = useState(false);
+  const [backendStatus, setBackendStatus] = useState<'checking' | 'ready' | 'waking'>('checking');
   const { toast } = useToast();
 
+  // Backend API base URL - configured via VITE_API_BASE environment variable
   const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+  
+  // Debug: Log API base URL on component mount
+  console.log("API_BASE configured as:", API_BASE);
+
+  // Health check system - monitors backend readiness
+  useEffect(() => {
+    let checkInterval: NodeJS.Timeout;
+    let attempts = 0;
+    const maxAttempts = 20; // 20 attempts × 5s = 100s max wait
+    
+    const checkBackendHealth = async () => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        
+        const response = await fetch(`${API_BASE}/`, { 
+          method: "HEAD",
+          signal: controller.signal 
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          console.log("✅ Backend is ready!");
+          setBackendStatus('ready');
+          clearInterval(checkInterval);
+          
+          toast({
+            title: "🚀 Server Ready",
+            description: "Backend is now online. You can start using the app!",
+            duration: 3000
+          });
+        }
+      } catch (err) {
+        attempts++;
+        console.log(`🔄 Backend check attempt ${attempts}/${maxAttempts}...`);
+        
+        if (attempts === 1) {
+          setBackendStatus('waking');
+          toast({
+            title: "⏳ Starting Server",
+            description: "Backend is waking up. This may take 30-60 seconds...",
+            duration: 5000
+          });
+        }
+        
+        if (attempts >= maxAttempts) {
+          console.error("❌ Backend failed to respond after maximum attempts");
+          setBackendStatus('ready'); // Allow user to try anyway
+          clearInterval(checkInterval);
+          
+          toast({
+            title: "⚠️ Server Slow to Respond",
+            description: "Backend is taking longer than expected. You can try using the app anyway.",
+            variant: "destructive",
+            duration: 5000
+          });
+        }
+      }
+    };
+    
+    // Initial check
+    checkBackendHealth();
+    
+    // Set up interval for repeated checks
+    checkInterval = setInterval(checkBackendHealth, 5000);
+    
+    // Cleanup on unmount
+    return () => {
+      if (checkInterval) clearInterval(checkInterval);
+    };
+  }, [API_BASE, toast]);
 
   const renderSuggestions = (text: string) => {
     if (!text) return null;
@@ -290,7 +364,14 @@ const Index = () => {
     }
 
     try {
-      console.debug("Uploading file to backend", { fileName: file.name, fileType: file.type });
+      console.log("Uploading file to backend", { fileName: file.name, fileType: file.type, apiUrl: `${API_BASE}/process_resume` });
+      
+      toast({ 
+        title: "Processing resume...", 
+        description: "This may take up to 60 seconds if the server is starting up.",
+        duration: 3000
+      });
+      
       const formData = new FormData();
       formData.append("file", file);
 
@@ -299,19 +380,23 @@ const Index = () => {
         body: formData,
       });
 
-      console.debug("process_resume response status", res.status, res.statusText);
+      console.log("process_resume response status", res.status, res.statusText);
 
       const text = await res.text();
+      console.log("process_resume raw response:", text);
+      
       // Try parse JSON, else show raw text
       let result: any = null;
       try {
         result = JSON.parse(text);
       } catch (e) {
-        console.warn("process_resume returned non-JSON response", text);
+        console.error("process_resume returned non-JSON response", text);
       }
 
       if (!res.ok) {
-        throw new Error(text || "Failed to process resume");
+        const errorMsg = result?.detail || text || "Failed to process resume";
+        console.error("process_resume error:", errorMsg);
+        throw new Error(errorMsg);
       }
 
       const userSkills = (result && result.skills) || [];
@@ -337,17 +422,86 @@ const Index = () => {
       return;
     }
     setAiLoading(true);
+    
+    // Show helpful toast
+    toast({ 
+      title: "Generating AI suggestions...", 
+      description: "This may take 10-20 seconds. Please wait.",
+      duration: 5000
+    });
+    
+    console.log("Requesting AI suggestions with skills:", skills);
+    
     try {
       const res = await fetch(`${API_BASE}/upskill_suggestions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ skills }),
       });
-      if (!res.ok) throw new Error("Failed to get suggestions");
-  const data = await res.json();
-  setSuggestions(data.suggestions || "");
+      
+      console.log("AI suggestions response status:", res.status, res.statusText);
+      
+      if (!res.ok) {
+        let errorMessage = "Failed to get suggestions";
+        let errorTitle = "AI Suggestions Unavailable";
+        
+        // Try to parse error response
+        const contentType = res.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          try {
+            const errorData = await res.json();
+            errorMessage = errorData.detail || errorData.message || errorMessage;
+          } catch (parseError) {
+            console.error("Failed to parse error JSON:", parseError);
+          }
+        } else {
+          const textError = await res.text();
+          if (textError) errorMessage = textError;
+        }
+        
+        // Customize message based on status code
+        if (res.status === 429 || errorMessage.toLowerCase().includes('quota')) {
+          errorTitle = "⚠️ AI Quota Limit Reached";
+          errorMessage = "The free Gemini API has reached its daily limit. Please try again tomorrow or upgrade to a paid plan.";
+        } else if (res.status === 401 || errorMessage.toLowerCase().includes('auth')) {
+          errorTitle = "🔒 Authentication Error";
+          errorMessage = "API authentication failed. Please contact support.";
+        } else if (res.status === 503) {
+          errorTitle = "🔧 Service Unavailable";
+          errorMessage = "AI service is not configured or temporarily unavailable.";
+        }
+        
+        // Show detailed toast
+        toast({ 
+          title: errorTitle,
+          description: errorMessage,
+          variant: "destructive",
+          duration: 8000
+        });
+        
+        return; // Exit early
+      }
+      
+      const data = await res.json();
+      setSuggestions(data.suggestions || "");
+      
+      toast({ 
+        title: "Success!", 
+        description: "AI upskilling suggestions generated.",
+        duration: 3000
+      });
     } catch (err: any) {
-      toast({ title: "Error", description: String(err), variant: "destructive" });
+      console.error("Error fetching AI suggestions:", err);
+      
+      // Only show generic error if we didn't already show a specific one
+      if (err.name !== "AbortError") {
+        toast({ 
+          title: "Connection Error", 
+          description: "Could not reach AI service. Please check your connection and try again.",
+          variant: "destructive",
+          duration: 6000
+        });
+      }
     } finally {
       setAiLoading(false);
     }
