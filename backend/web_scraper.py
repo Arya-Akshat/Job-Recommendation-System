@@ -102,18 +102,31 @@ def fetch_and_update_jobs() -> int:
         return 0
 
     new_df = pd.DataFrame(jobs)
-    if not existing_df.empty:
-        combined = pd.concat([existing_df, new_df], ignore_index=True)
-    else:
-        combined = new_df
-
-    deduped = combined.drop_duplicates(subset=['Link'], keep='first')
-    new_count = max(0, len(deduped) - len(existing_df))
-
+    
+    # Deduplicate the newly scraped jobs by Link
+    new_df = new_df.drop_duplicates(subset=['Link'], keep='first')
+    
+    # Calculate the difference: how many jobs changed
+    old_count = len(existing_df) if not existing_df.empty else 0
+    new_count = len(new_df)
+    
+    # REPLACE the entire job list with fresh data from the website
+    # This ensures deleted jobs are removed and new jobs are added
     os.makedirs(data_dir, exist_ok=True)
-    deduped.to_csv(job_data_path, index=False)
+    new_df.to_csv(job_data_path, index=False)
 
-    print(f'Scraped {len(new_df)} jobs, added {new_count} new ones')
+    jobs_added = max(0, new_count - old_count)
+    jobs_removed = max(0, old_count - new_count)
+    
+    if jobs_added > 0 and jobs_removed > 0:
+        print(f'Updated job list: +{jobs_added} new, -{jobs_removed} removed, total: {new_count}')
+    elif jobs_added > 0:
+        print(f'Added {jobs_added} new jobs, total: {new_count}')
+    elif jobs_removed > 0:
+        print(f'Removed {jobs_removed} old jobs, total: {new_count}')
+    else:
+        print(f'No changes, total: {new_count} jobs')
+    
     return new_count
 
 

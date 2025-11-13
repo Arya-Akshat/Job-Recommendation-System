@@ -210,17 +210,15 @@ async def upskill_suggestions_endpoint(request: UpskillSuggestionsRequest):
 @app.post("/fetch_new_jobs", response_model=FetchJobsResponse)
 async def fetch_new_jobs_endpoint():
     """
-    Triggers the web scraper to fetch new job listings and update job_data.csv.
+    Triggers the web scraper to fetch new job listings and completely refresh job_data.csv.
+    This replaces the entire job list with fresh data from the website.
     """
     try:
-        new_jobs_count = web_scraper.fetch_and_update_jobs()
-        if new_jobs_count == 0:
-            message = "No new jobs found. All current listings are already in the database."
-        else:
-            message = f"Successfully added {new_jobs_count} new job listings to the database."
+        total_jobs_count = web_scraper.fetch_and_update_jobs()
+        message = f"Job database refreshed. Total jobs in database: {total_jobs_count}"
         
         return FetchJobsResponse(
-            new_jobs_count=new_jobs_count,
+            new_jobs_count=total_jobs_count,
             message=message
         )
     except Exception as e:
