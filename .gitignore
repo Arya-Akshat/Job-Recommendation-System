@@ -18,6 +18,9 @@ backend/venv_backend/
 .env
 backend/.env
 .env.*
+.env.local
+frontend/.env.local
+!frontend/.env.example
 
 # Node
 node_modules/
