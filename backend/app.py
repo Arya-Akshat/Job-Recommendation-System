@@ -36,21 +36,24 @@ app = FastAPI(
 )
 
 # Allow CORS from the frontend dev server(s) and production
-origins = [
+# Note: FastAPI CORS doesn't support wildcard subdomains, so we use allow_origin_regex
+import re
+
+allowed_origins = [
     "http://localhost:8080",
     "http://127.0.0.1:8080",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "https://*.vercel.app",  # Vercel preview deployments
-    os.getenv("FRONTEND_URL", ""),  # Production frontend URL from env
 ]
 
-# Filter out empty strings
-origins = [origin for origin in origins if origin]
+# Add custom origins if provided
+if os.getenv("FRONTEND_URL"):
+    allowed_origins.append(os.getenv("FRONTEND_URL"))
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins if origins else ["*"],  # Allow all if no origins specified
+    allow_origins=allowed_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",  # Allow all Vercel deployments (production + previews)
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
@@ -101,6 +104,17 @@ class FetchJobsResponse(BaseModel):
 
 # --- API Endpoints ---
 
+@app.get("/")
+@app.head("/")
+async def root():
+    """Health check endpoint - supports both GET and HEAD methods"""
+    return {
+        "message": "Job Recommendation Backend API",
+        "version": "1.0.0",
+        "status": "running",
+        "cors_enabled": True
+    }
+
 @app.post("/process_resume", response_model=ProcessResumeResponse)
 async def process_resume_endpoint(file: UploadFile = File(...)):
     """
@@ -147,22 +161,51 @@ async def recommend_jobs_endpoint(request: RecommendJobsRequest):
 async def upskill_suggestions_endpoint(request: UpskillSuggestionsRequest):
     """
     Provides AI-powered upskilling suggestions based on user skills.
+    Uses Gemini Flash (faster model) with optimized prompting.
     """
+    if not genai:
+        raise HTTPException(status_code=503, detail="AI service not configured. Set GEMINI_API_KEY environment variable.")
+    
+    # Use Flash model for faster responses
     model = genai.GenerativeModel(
-        model_name="models/gemini-2.5-flash", # Use the model confirmed to be available
+        model_name="models/gemini-2.0-flash-exp",  # Faster Flash model
         system_instruction=GEMINI_SYSTEM_PROMPT
     )
-    if not model:
-        raise HTTPException(status_code=500, detail="Gemini model not configured.")
 
-    user_prompt = "Skills = " + ','.join(request.skills)
+    # Optimized prompt for faster response
+    user_prompt = f"Skills: {', '.join(request.skills[:10])}"  # Limit to 10 skills for speed
     
     try:
-        response = model.generate_content(user_prompt, stream=True)
-        suggestions = "".join(word.text for word in response)
+        # Use non-streaming for simpler response
+        response = model.generate_content(
+            user_prompt,
+            generation_config=genai.types.GenerationConfig(
+                max_output_tokens=800,  # Limit response length for speed
+                temperature=0.7,
+            )
+        )
+        suggestions = response.text
         return UpskillSuggestionsResponse(suggestions=suggestions)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error generating upskilling suggestions: {e}")
+        error_str = str(e).lower()
+        print(f"Gemini API error: {e}")
+        
+        # Check for quota/rate limit errors
+        if any(keyword in error_str for keyword in ['quota', 'resource_exhausted', 'rate limit', '429']):
+            raise HTTPException(
+                status_code=429, 
+                detail="AI service quota exceeded. The free tier has daily limits. Please try again later or upgrade your Gemini API plan."
+            )
+        elif 'api key' in error_str or 'authentication' in error_str or 'permission' in error_str:
+            raise HTTPException(
+                status_code=401,
+                detail="AI service authentication failed. Please check your GEMINI_API_KEY."
+            )
+        else:
+            raise HTTPException(
+                status_code=500, 
+                detail=f"AI service error: {str(e)}"
+            )
 
 @app.post("/fetch_new_jobs", response_model=FetchJobsResponse)
 async def fetch_new_jobs_endpoint():
@@ -171,9 +214,14 @@ async def fetch_new_jobs_endpoint():
     """
     try:
         new_jobs_count = web_scraper.fetch_and_update_jobs()
+        if new_jobs_count == 0:
+            message = "No new jobs found. All current listings are already in the database."
+        else:
+            message = f"Successfully added {new_jobs_count} new job listings to the database."
+        
         return FetchJobsResponse(
             new_jobs_count=new_jobs_count,
-            message=f"Successfully fetched and updated {new_jobs_count} new job listings."
+            message=message
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching new jobs: {e}")
