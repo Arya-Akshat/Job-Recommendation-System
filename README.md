@@ -18,7 +18,7 @@
 
 # Job Recommendation System
 
-🚀 **Live Demo:** [https://job-recommendaton-system.vercel.app](https://job-recommendaton-system.vercel.app)
+🚀 **Live Demo:** [https://job-recommendation-system-gamma.vercel.app](https://job-recommendation-system-gamma.vercel.app)
 
 A modern job recommendation system that ingests a candidate's resume, extracts skills and experience, and returns ranked job matches and AI-powered upskill suggestions.
 
