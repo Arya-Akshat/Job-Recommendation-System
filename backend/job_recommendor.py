@@ -144,34 +144,46 @@ def get_recommendations(user_skills_list: List[str], user_work_experience: int) 
     jd_df['Match Confidence'] = matches['Match Confidence']
 
     # --- 5. Score and Rank Jobs ---
-    jd_df['Experience Check'] = jd_df['Required Experience'] <= user_work_experience
-    filtered_jobs = jd_df[jd_df['Experience Check']].copy()
-
-    filtered_jobs['Experience Score'] = filtered_jobs['Required Experience'].apply(
+    # Calculate scores for ALL jobs, not just those matching experience requirements
+    jd_df['Experience Score'] = jd_df['Required Experience'].apply(
         lambda x: calculate_experience_score(x, user_work_experience)
     )
 
-    # Calculate combined score for the filtered jobs
-    match_confidence_filtered = matches.loc[filtered_jobs.index]['Match Confidence']
-    filtered_jobs['Combined Score'] = (match_confidence_filtered * CONFIDENCE_WEIGHT) + (filtered_jobs['Experience Score'] * EXPERIENCE_WEIGHT)
+    # Calculate combined score for all jobs
+    jd_df['Combined Score'] = (jd_df['Match Confidence'] * CONFIDENCE_WEIGHT) + (jd_df['Experience Score'] * EXPERIENCE_WEIGHT)
     
     # Normalize the combined scores
-    min_score = filtered_jobs['Combined Score'].min()
-    max_score = filtered_jobs['Combined Score'].max()
+    min_score = jd_df['Combined Score'].min()
+    max_score = jd_df['Combined Score'].max()
     if max_score > min_score:
-        filtered_jobs['Combined Score'] = (filtered_jobs['Combined Score'] - min_score) / (max_score - min_score)
+        jd_df['Combined Score'] = (jd_df['Combined Score'] - min_score) / (max_score - min_score)
     else:
-        filtered_jobs['Combined Score'] = 0 # Handle case where all scores are the same
+        jd_df['Combined Score'] = 0.5 # Handle case where all scores are the same
 
     # --- 6. Finalize Recommendations ---
-    recommended_jobs = filtered_jobs[
-        (filtered_jobs['Combined Score'] > 0) & (filtered_jobs['Match Confidence'] > 0)
-    ].copy()
+    # Show jobs with ANY match confidence (even if very low)
+    # This ensures we always show at least 10-15 jobs
+    recommended_jobs = jd_df[jd_df['Match Confidence'] > 0].copy()
+    
+    # If still not enough jobs, show all jobs
+    if len(recommended_jobs) < 10:
+        print(f"Only {len(recommended_jobs)} jobs matched, showing all {len(jd_df)} jobs")
+        recommended_jobs = jd_df.copy()
 
     recommended_jobs['Strengths'] = recommended_jobs['skills'].apply(lambda x: find_strengths(x, user_skills_set))
     recommended_jobs['Weakness'] = recommended_jobs['Title'].apply(lambda x: find_weaknesses(x, user_skills_set, job_skill_weights))
     
     recommended_jobs = recommended_jobs.sort_values(by='Combined Score', ascending=False)
+
+    # Ensure we return at least 10 jobs if available, maximum 25
+    min_jobs = min(10, len(recommended_jobs))
+    max_jobs = min(25, len(recommended_jobs))
+    
+    # Return at least 10 jobs, or all if less than 10 available
+    if len(recommended_jobs) >= min_jobs:
+        recommended_jobs = recommended_jobs.head(max_jobs)
+    
+    print(f"Returning {len(recommended_jobs)} job recommendations")
 
     # --- 7. Return Results ---
     # The FastAPI app will handle saving to CSV if needed, or return directly
