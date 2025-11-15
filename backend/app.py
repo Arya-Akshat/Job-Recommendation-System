@@ -27,6 +27,8 @@ except Exception:
     # Fall back to the local placeholder if the real scraper cannot be imported
     import web_scraper_local as web_scraper
 import google.generativeai as genai
+import traceback
+from google.api_core import exceptions as api_exceptions
 
 # --- FastAPI App Initialization ---
 app = FastAPI(
@@ -187,25 +189,68 @@ async def upskill_suggestions_endpoint(request: UpskillSuggestionsRequest):
         suggestions = response.text
         return UpskillSuggestionsResponse(suggestions=suggestions)
     except Exception as e:
+        # Log full traceback for debugging
+        tb = traceback.format_exc()
+        print("Gemini API error (traceback):", tb)
+
+        # Normalize text for string checks
         error_str = str(e).lower()
-        print(f"Gemini API error: {e}")
-        
-        # Check for quota/rate limit errors
-        if any(keyword in error_str for keyword in ['quota', 'resource_exhausted', 'rate limit', '429']):
+
+        # 1) Prefer checking well-known google api exception classes
+        try:
+            if isinstance(e, api_exceptions.ResourceExhausted):
+                raise HTTPException(
+                    status_code=429,
+                    detail="AI service quota exceeded. The free tier has daily limits. Please try again later or upgrade your Gemini API plan."
+                )
+            if isinstance(e, api_exceptions.RateLimitExceeded):
+                raise HTTPException(
+                    status_code=429,
+                    detail="AI service rate limit exceeded. Please retry later."
+                )
+            if isinstance(e, api_exceptions.Unauthenticated) or isinstance(e, api_exceptions.PermissionDenied):
+                raise HTTPException(
+                    status_code=401,
+                    detail="AI service authentication failed. Please check your GEMINI_API_KEY."
+                )
+        except NameError:
+            # api_exceptions may not define all names on every version; ignore and fall back to string checks
+            pass
+
+        # 2) Fallback to robust string / attribute checks
+        status_code = None
+        for attr in ('status_code', 'code', 'status'):
+            if hasattr(e, attr):
+                try:
+                    status_code = int(getattr(e, attr))
+                    break
+                except Exception:
+                    # sometimes code is an enum or string
+                    val = getattr(e, attr)
+                    try:
+                        if hasattr(val, 'value'):
+                            status_code = int(val.value)
+                            break
+                    except Exception:
+                        pass
+
+        if status_code == 429 or any(k in error_str for k in ['quota', 'resource_exhausted', 'rate limit', 'rate_limit', '429']):
             raise HTTPException(
-                status_code=429, 
-                detail="AI service quota exceeded. The free tier has daily limits. Please try again later or upgrade your Gemini API plan."
+                status_code=429,
+                detail="AI service quota or rate limit exceeded. The free tier has daily limits. Please try again later or upgrade your Gemini API plan."
             )
-        elif 'api key' in error_str or 'authentication' in error_str or 'permission' in error_str:
+
+        if status_code in (401, 403) or any(k in error_str for k in ['api key', 'authentication', 'permission denied', 'unauthorized']):
             raise HTTPException(
                 status_code=401,
                 detail="AI service authentication failed. Please check your GEMINI_API_KEY."
             )
-        else:
-            raise HTTPException(
-                status_code=500, 
-                detail=f"AI service error: {str(e)}"
-            )
+
+        # Default: surface the raw error for easier debugging
+        raise HTTPException(
+            status_code=500,
+            detail=f"AI service error: {str(e)}"
+        )
 
 @app.post("/fetch_new_jobs", response_model=FetchJobsResponse)
 async def fetch_new_jobs_endpoint():
