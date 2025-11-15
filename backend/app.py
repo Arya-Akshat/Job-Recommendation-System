@@ -192,27 +192,52 @@ async def upskill_suggestions_endpoint(request: UpskillSuggestionsRequest):
         # Log full traceback for debugging
         tb = traceback.format_exc()
         print("Gemini API error (traceback):", tb)
+        # Additional diagnostics: print exception type, repr, and common attributes
+        try:
+            print("Gemini exception type:", type(e))
+            print("Gemini exception repr:", repr(e))
+            # Print useful diagnostic attributes if present
+            for attr in ('status_code', 'code', 'status', 'message', 'errors'):
+                try:
+                    val = getattr(e, attr, None)
+                    if val is not None:
+                        print(f"Gemini exception {attr}:", val)
+                except Exception:
+                    pass
+        except Exception:
+            # If even printing diagnostics fails, ignore to avoid masking original traceback
+            pass
 
         # Normalize text for string checks
         error_str = str(e).lower()
 
         # 1) Prefer checking well-known google api exception classes
         try:
-            if isinstance(e, api_exceptions.ResourceExhausted):
-                raise HTTPException(
-                    status_code=429,
-                    detail="AI service quota exceeded. The free tier has daily limits. Please try again later or upgrade your Gemini API plan."
-                )
-            if isinstance(e, api_exceptions.RateLimitExceeded):
-                raise HTTPException(
-                    status_code=429,
-                    detail="AI service rate limit exceeded. Please retry later."
-                )
-            if isinstance(e, api_exceptions.Unauthenticated) or isinstance(e, api_exceptions.PermissionDenied):
-                raise HTTPException(
-                    status_code=401,
-                    detail="AI service authentication failed. Please check your GEMINI_API_KEY."
-                )
+                debug_name = type(e).__name__ if e is not None else "UnknownException"
+                if isinstance(e, api_exceptions.ResourceExhausted):
+                    raise HTTPException(
+                        status_code=429,
+                        detail=(
+                            "AI service quota exceeded. The free tier has daily limits. Please try again later or upgrade your Gemini API plan."
+                            f" (debug_exception: {debug_name})"
+                        )
+                    )
+                if isinstance(e, api_exceptions.RateLimitExceeded):
+                    raise HTTPException(
+                        status_code=429,
+                        detail=(
+                            "AI service rate limit exceeded. Please retry later."
+                            f" (debug_exception: {debug_name})"
+                        )
+                    )
+                if isinstance(e, api_exceptions.Unauthenticated) or isinstance(e, api_exceptions.PermissionDenied):
+                    raise HTTPException(
+                        status_code=401,
+                        detail=(
+                            "AI service authentication failed. Please check your GEMINI_API_KEY."
+                            f" (debug_exception: {debug_name})"
+                        )
+                    )
         except NameError:
             # api_exceptions may not define all names on every version; ignore and fall back to string checks
             pass
@@ -234,22 +259,30 @@ async def upskill_suggestions_endpoint(request: UpskillSuggestionsRequest):
                     except Exception:
                         pass
 
+        debug_name = type(e).__name__ if e is not None else "UnknownException"
         if status_code == 429 or any(k in error_str for k in ['quota', 'resource_exhausted', 'rate limit', 'rate_limit', '429']):
             raise HTTPException(
                 status_code=429,
-                detail="AI service quota or rate limit exceeded. The free tier has daily limits. Please try again later or upgrade your Gemini API plan."
+                detail=(
+                    "AI service quota or rate limit exceeded. The free tier has daily limits. Please try again later or upgrade your Gemini API plan."
+                    f" (debug_exception: {debug_name})"
+                )
             )
 
         if status_code in (401, 403) or any(k in error_str for k in ['api key', 'authentication', 'permission denied', 'unauthorized']):
             raise HTTPException(
                 status_code=401,
-                detail="AI service authentication failed. Please check your GEMINI_API_KEY."
+                detail=(
+                    "AI service authentication failed. Please check your GEMINI_API_KEY."
+                    f" (debug_exception: {debug_name})"
+                )
             )
 
         # Default: surface the raw error for easier debugging
+        # Default: surface the raw error message but append only the exception class name for quick debugging
         raise HTTPException(
             status_code=500,
-            detail=f"AI service error: {str(e)}"
+            detail=(f"AI service error: {str(e)} (debug_exception: {type(e).__name__})")
         )
 
 @app.post("/fetch_new_jobs", response_model=FetchJobsResponse)
