@@ -302,9 +302,12 @@ async def upskill_suggestions_endpoint(request: UpskillSuggestionsRequest):
         # Decide quota/rate-limit: require either sdk exception types, explicit 429
         # numeric status, or a code enum/name that indicates RESOURCE_EXHAUSTED/THROTTLED
         quota_code_names = {'resource_exhausted', 'resource-exhausted', 'rate_limit_exceeded', 'rate_limited', 'throttled'}
-        if isinstance(e, (api_exceptions.ResourceExhausted, api_exceptions.RateLimitExceeded)) or \
-           (status_code == 429) or \
-           (code_name and any(name in code_name for name in quota_code_names)):
+        quota_types = tuple(t for t in (
+            getattr(api_exceptions, 'ResourceExhausted', None),
+            getattr(api_exceptions, 'RateLimitExceeded', None),
+        ) if t is not None)
+        is_quota_type = bool(quota_types) and isinstance(e, quota_types)
+        if is_quota_type or (status_code == 429) or (code_name and any(name in code_name for name in quota_code_names)):
             raise HTTPException(
                 status_code=429,
                 detail=(
@@ -326,24 +329,9 @@ async def upskill_suggestions_endpoint(request: UpskillSuggestionsRequest):
                 )
             )
 
-        debug_name = type(e).__name__ if e is not None else "UnknownException"
-        if status_code == 429 or any(k in error_str for k in ['quota', 'resource_exhausted', 'rate limit', 'rate_limit', '429']):
-            raise HTTPException(
-                status_code=429,
-                detail=(
-                    "AI service quota or rate limit exceeded. The free tier has daily limits. Please try again later or upgrade your Gemini API plan."
-                    f" (debug_exception: {debug_name})"
-                )
-            )
-
-        if status_code in (401, 403) or any(k in error_str for k in ['api key', 'authentication', 'permission denied', 'unauthorized']):
-            raise HTTPException(
-                status_code=401,
-                detail=(
-                    "AI service authentication failed. Please check your GEMINI_API_KEY."
-                    f" (debug_exception: {debug_name})"
-                )
-            )
+        # Note: substring-based checks like 'quota' were intentionally removed
+        # to avoid false-positive classification. We rely on explicit SDK types,
+        # numeric status codes, or code enum/names above.
 
         # Default: surface the raw error for easier debugging
         # Default: surface the raw error message but append only the exception class name for quick debugging
