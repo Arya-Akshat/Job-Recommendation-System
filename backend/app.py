@@ -213,51 +213,94 @@ async def upskill_suggestions_endpoint(request: UpskillSuggestionsRequest):
 
         # 1) Prefer checking well-known google api exception classes
         try:
-                debug_name = type(e).__name__ if e is not None else "UnknownException"
-                if isinstance(e, api_exceptions.ResourceExhausted):
-                    raise HTTPException(
-                        status_code=429,
-                        detail=(
-                            "AI service quota exceeded. The free tier has daily limits. Please try again later or upgrade your Gemini API plan."
-                            f" (debug_exception: {debug_name})"
-                        )
+            debug_name = type(e).__name__ if e is not None else "UnknownException"
+            if isinstance(e, api_exceptions.ResourceExhausted):
+                raise HTTPException(
+                    status_code=429,
+                    detail=(
+                        "AI service quota exceeded. The free tier has daily limits. Please try again later or upgrade your Gemini API plan."
+                        f" (debug_exception: {debug_name})"
                     )
-                if isinstance(e, api_exceptions.RateLimitExceeded):
-                    raise HTTPException(
-                        status_code=429,
-                        detail=(
-                            "AI service rate limit exceeded. Please retry later."
-                            f" (debug_exception: {debug_name})"
-                        )
+                )
+            if isinstance(e, api_exceptions.RateLimitExceeded):
+                raise HTTPException(
+                    status_code=429,
+                    detail=(
+                        "AI service rate limit exceeded. Please retry later."
+                        f" (debug_exception: {debug_name})"
                     )
-                if isinstance(e, api_exceptions.Unauthenticated) or isinstance(e, api_exceptions.PermissionDenied):
-                    raise HTTPException(
-                        status_code=401,
-                        detail=(
-                            "AI service authentication failed. Please check your GEMINI_API_KEY."
-                            f" (debug_exception: {debug_name})"
-                        )
+                )
+            if isinstance(e, api_exceptions.Unauthenticated) or isinstance(e, api_exceptions.PermissionDenied):
+                raise HTTPException(
+                    status_code=401,
+                    detail=(
+                        "AI service authentication failed. Please check your GEMINI_API_KEY."
+                        f" (debug_exception: {debug_name})"
                     )
+                )
         except NameError:
             # api_exceptions may not define all names on every version; ignore and fall back to string checks
             pass
 
         # 2) Fallback to robust string / attribute checks
         status_code = None
-        for attr in ('status_code', 'code', 'status'):
+        code_name = None
+        # Try common attributes where libraries expose HTTP/grpc codes
+        for attr in ('status_code', 'http_status', 'code', 'status'):
             if hasattr(e, attr):
                 try:
-                    status_code = int(getattr(e, attr))
-                    break
-                except Exception:
-                    # sometimes code is an enum or string
                     val = getattr(e, attr)
-                    try:
-                        if hasattr(val, 'value'):
-                            status_code = int(val.value)
-                            break
-                    except Exception:
-                        pass
+                    # If it's an int-like status code
+                    if isinstance(val, int):
+                        status_code = int(val)
+                        break
+                    # Some libs expose an enum with .value or .name
+                    if hasattr(val, 'value') and isinstance(val.value, int):
+                        status_code = int(val.value)
+                        break
+                    # Capture the symbolic name if present (e.g., grpc StatusCode)
+                    if hasattr(val, 'name') and isinstance(val.name, str):
+                        code_name = val.name.lower()
+                except Exception:
+                    pass
+
+        # If .code attribute exists and is not an enum, coerce to string name
+        if code_name is None and hasattr(e, 'code'):
+            try:
+                raw_code = getattr(e, 'code')
+                if isinstance(raw_code, str):
+                    code_name = raw_code.lower()
+                elif hasattr(raw_code, 'name'):
+                    code_name = str(raw_code.name).lower()
+            except Exception:
+                pass
+
+        # Decide quota/rate-limit: require either sdk exception types, explicit 429
+        # numeric status, or a code enum/name that indicates RESOURCE_EXHAUSTED/THROTTLED
+        quota_code_names = {'resource_exhausted', 'resource-exhausted', 'rate_limit_exceeded', 'rate_limited', 'throttled'}
+        if isinstance(e, (api_exceptions.ResourceExhausted, api_exceptions.RateLimitExceeded)) or \
+           (status_code == 429) or \
+           (code_name and any(name in code_name for name in quota_code_names)):
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    "AI service quota or rate limit exceeded. The free tier has daily limits. Please try again later or upgrade your Gemini API plan."
+                    f" (debug_exception: {debug_name})"
+                )
+            )
+
+        # Authentication / permission errors: prefer explicit exception types or codes
+        auth_code_names = {'unauthenticated', 'permission_denied', 'permission-denied', 'unauthorized'}
+        if isinstance(e, (api_exceptions.Unauthenticated, api_exceptions.PermissionDenied)) or \
+           (status_code in (401, 403)) or \
+           (code_name and any(name in code_name for name in auth_code_names)):
+            raise HTTPException(
+                status_code=401,
+                detail=(
+                    "AI service authentication failed. Please check your GEMINI_API_KEY."
+                    f" (debug_exception: {debug_name})"
+                )
+            )
 
         debug_name = type(e).__name__ if e is not None else "UnknownException"
         if status_code == 429 or any(k in error_str for k in ['quota', 'resource_exhausted', 'rate limit', 'rate_limit', '429']):
