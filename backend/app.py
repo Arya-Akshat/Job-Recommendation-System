@@ -211,10 +211,22 @@ async def upskill_suggestions_endpoint(request: UpskillSuggestionsRequest):
         # Normalize text for string checks
         error_str = str(e).lower()
 
-        # 1) Prefer checking well-known google api exception classes
+        # 1) Prefer checking well-known google api exception classes safely
+        debug_name = type(e).__name__ if e is not None else "UnknownException"
         try:
-            debug_name = type(e).__name__ if e is not None else "UnknownException"
-            if isinstance(e, api_exceptions.ResourceExhausted):
+            # Build type tuples only for attributes that actually exist on api_exceptions
+            quota_types = tuple(t for t in (
+                getattr(api_exceptions, 'ResourceExhausted', None),
+                getattr(api_exceptions, 'RateLimitExceeded', None),
+            ) if t is not None)
+
+            auth_types = tuple(t for t in (
+                getattr(api_exceptions, 'Unauthenticated', None),
+                getattr(api_exceptions, 'PermissionDenied', None),
+            ) if t is not None)
+
+            # If the exception is a known quota/rate-limit type, map to 429.
+            if quota_types and isinstance(e, quota_types):
                 raise HTTPException(
                     status_code=429,
                     detail=(
@@ -222,15 +234,9 @@ async def upskill_suggestions_endpoint(request: UpskillSuggestionsRequest):
                         f" (debug_exception: {debug_name})"
                     )
                 )
-            if isinstance(e, api_exceptions.RateLimitExceeded):
-                raise HTTPException(
-                    status_code=429,
-                    detail=(
-                        "AI service rate limit exceeded. Please retry later."
-                        f" (debug_exception: {debug_name})"
-                    )
-                )
-            if isinstance(e, api_exceptions.Unauthenticated) or isinstance(e, api_exceptions.PermissionDenied):
+
+            # If the exception is a known auth type, map to 401.
+            if auth_types and isinstance(e, auth_types):
                 raise HTTPException(
                     status_code=401,
                     detail=(
@@ -238,8 +244,26 @@ async def upskill_suggestions_endpoint(request: UpskillSuggestionsRequest):
                         f" (debug_exception: {debug_name})"
                     )
                 )
-        except NameError:
-            # api_exceptions may not define all names on every version; ignore and fall back to string checks
+
+            # Some versions of the underlying library return InvalidArgument for
+            # a missing/invalid API key with a clear message. Detect that and
+            # classify as authentication failure (401) instead of letting the
+            # AttributeError or generic 500 surface.
+            invalid_arg_cls = getattr(api_exceptions, 'InvalidArgument', None)
+            if invalid_arg_cls and isinstance(e, invalid_arg_cls):
+                # Look for the specific API key error message from the SDK.
+                if 'api key not found' in error_str or 'api_key_invalid' in error_str or 'api key invalid' in error_str:
+                    raise HTTPException(
+                        status_code=401,
+                        detail=(
+                            "AI service authentication failed: API key invalid or not found. Please update GEMINI_API_KEY in your deployment environment."
+                            f" (debug_exception: {debug_name})"
+                        )
+                    )
+        except Exception:
+            # Defensive: any unexpected error while inspecting exception types
+            # should not crash the request handler. Fall through to the
+            # attribute/string-based checks below.
             pass
 
         # 2) Fallback to robust string / attribute checks
